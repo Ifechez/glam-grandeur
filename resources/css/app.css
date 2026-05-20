@@ -1,0 +1,10 @@
+@font-face {
+    font-family: 'Rosic';
+    src: url('./fonts/Rosica.otf') format('truetype'); /* Update filename/extension if it's .otf or .woff */
+    font-weight: normal;
+    font-style: normal;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

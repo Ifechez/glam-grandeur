@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "ignoreDeprecations": "6.0",
+        "module": "ESNext",
+        "moduleResolution": "node",
+        "target": "ES6",
+        "paths": {
+            "@/*": ["./resources/js/*"],
+            "ziggy-js": ["./vendor/tightenco/ziggy"]
+        }
+    },
+    "exclude": ["node_modules", "public", "vendor", "storage"]
+}
