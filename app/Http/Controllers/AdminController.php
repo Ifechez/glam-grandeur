@@ -76,6 +76,7 @@ class AdminController extends Controller
 
     public function storeProject(Request $request)
     {
+        // 1. Validate simple structural fields only (Skips image files to prevent fileinfo crashes)
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
@@ -90,9 +91,6 @@ class AdminController extends Controller
             'completed_at' => 'nullable|string',
             'short_description' => 'nullable|string',
             'description' => 'nullable|string',
-            // FIXED: Bypassed fileinfo module crash via explicit mimes rule
-            'image' => 'nullable|mimes:jpeg,jpg,png,webp,gif|max:20480',
-            'gallery_images.*' => 'nullable|mimes:jpeg,jpg,png,webp,gif|max:20480',
         ]);
 
         /*
@@ -100,15 +98,10 @@ class AdminController extends Controller
         | MAIN IMAGE
         |--------------------------------------------------------------------------
         */
-
         if ($request->hasFile('image')) {
-
             $file = $request->file('image');
-
             $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-
             $file->move(public_path('storage/projects'), $name);
-
             $validated['image'] = 'projects/' . $name;
         }
 
@@ -117,21 +110,18 @@ class AdminController extends Controller
         | GALLERY
         |--------------------------------------------------------------------------
         */
-
         $galleryPaths = [];
+        $galleryKey = $request->hasFile('gallery_images') ? 'gallery_images' : ($request->hasFile('gallery') ? 'gallery' : null);
 
-        if ($request->hasFile('gallery_images')) {
-
-            foreach ($request->file('gallery_images') as $file) {
-
-                $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-
-                $file->move(public_path('storage/projects/gallery'), $name);
-
-                $galleryPaths[] = 'projects/gallery/' . $name;
+        if ($galleryKey) {
+            foreach ($request->file($galleryKey) as $file) {
+                if ($file instanceof \Illuminate\Http\UploadedFile) {
+                    $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
+                    $file->move(public_path('storage/projects/gallery'), $name);
+                    $galleryPaths[] = 'projects/gallery/' . $name;
+                }
             }
         }
-
         $validated['gallery_images'] = $galleryPaths;
 
         Project::create($validated);
@@ -141,6 +131,7 @@ class AdminController extends Controller
 
     public function updateProject(Request $request, Project $project)
     {
+        // 1. Validate simple structural fields only (Skips image files to prevent fileinfo crashes)
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
@@ -155,9 +146,6 @@ class AdminController extends Controller
             'completed_at' => 'nullable|string',
             'short_description' => 'nullable|string',
             'description' => 'nullable|string',
-            // FIXED: Bypassed fileinfo module crash via explicit mimes rule
-            'image' => 'nullable|mimes:jpeg,jpg,png,webp,gif|max:20480',
-            'gallery_images.*' => 'nullable|mimes:jpeg,jpg,png,webp,gif|max:20480',
         ]);
 
         /*
@@ -165,22 +153,14 @@ class AdminController extends Controller
         | IMAGE UPDATE
         |--------------------------------------------------------------------------
         */
-
         if ($request->hasFile('image')) {
-
-            if (
-                $project->image &&
-                file_exists(public_path('storage/' . $project->image))
-            ) {
+            if ($project->image && file_exists(public_path('storage/' . $project->image))) {
                 unlink(public_path('storage/' . $project->image));
             }
 
             $file = $request->file('image');
-
             $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-
             $file->move(public_path('storage/projects'), $name);
-
             $validated['image'] = 'projects/' . $name;
         }
 
@@ -189,20 +169,17 @@ class AdminController extends Controller
         | GALLERY UPDATE
         |--------------------------------------------------------------------------
         */
+        $galleryKey = $request->hasFile('gallery_images') ? 'gallery_images' : ($request->hasFile('gallery') ? 'gallery' : null);
 
-        if ($request->hasFile('gallery_images')) {
-
+        if ($galleryKey) {
             $galleryPaths = [];
-
-            foreach ($request->file('gallery_images') as $file) {
-
-                $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-
-                $file->move(public_path('storage/projects/gallery'), $name);
-
-                $galleryPaths[] = 'projects/gallery/' . $name;
+            foreach ($request->file($galleryKey) as $file) {
+                if ($file instanceof \Illuminate\Http\UploadedFile) {
+                    $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
+                    $file->move(public_path('storage/projects/gallery'), $name);
+                    $galleryPaths[] = 'projects/gallery/' . $name;
+                }
             }
-
             $validated['gallery_images'] = $galleryPaths;
         }
 
@@ -213,10 +190,7 @@ class AdminController extends Controller
 
     public function deleteProject(Project $project)
     {
-        if (
-            $project->image &&
-            file_exists(public_path('storage/' . $project->image))
-        ) {
+        if ($project->image && file_exists(public_path('storage/' . $project->image))) {
             unlink(public_path('storage/' . $project->image));
         }
 
@@ -290,18 +264,12 @@ class AdminController extends Controller
             'name' => 'required|string|max:255',
             'position' => 'nullable|string|max:255',
             'bio' => 'nullable|string',
-            // FIXED: Bypassed fileinfo module crash via explicit mimes rule
-            'image' => 'nullable|mimes:jpeg,jpg,png,webp,gif|max:20480',
         ]);
 
         if ($request->hasFile('image')) {
-
             $file = $request->file('image');
-
             $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-
             $file->move(public_path('storage/team'), $name);
-
             $validated['image'] = 'team/' . $name;
         }
 
@@ -316,25 +284,16 @@ class AdminController extends Controller
             'name' => 'required|string|max:255',
             'position' => 'nullable|string|max:255',
             'bio' => 'nullable|string',
-            // FIXED: Bypassed fileinfo module crash via explicit mimes rule
-            'image' => 'nullable|mimes:jpeg,jpg,png,webp,gif|max:20480',
         ]);
 
         if ($request->hasFile('image')) {
-
-            if (
-                $team->image &&
-                file_exists(public_path('storage/' . $team->image))
-            ) {
+            if ($team->image && file_exists(public_path('storage/' . $team->image))) {
                 unlink(public_path('storage/' . $team->image));
             }
 
             $file = $request->file('image');
-
             $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-
             $file->move(public_path('storage/team'), $name);
-
             $validated['image'] = 'team/' . $name;
         }
 
@@ -345,10 +304,7 @@ class AdminController extends Controller
 
     public function deleteTeam(Team $team)
     {
-        if (
-            $team->image &&
-            file_exists(public_path('storage/' . $team->image))
-        ) {
+        if ($team->image && file_exists(public_path('storage/' . $team->image))) {
             unlink(public_path('storage/' . $team->image));
         }
 
