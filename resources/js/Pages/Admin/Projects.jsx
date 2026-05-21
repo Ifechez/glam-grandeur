@@ -158,9 +158,19 @@ export default function Projects({ auth, projects = [] }) {
             ? route('admin.projects.store')
             : route('admin.projects.update', selectedProject.id);
 
+        // Deep clone data to modify safely before passing to Inertia form request handlers
         const payload = { ...data };
-        if (!payload.image) delete payload.image;
-        if (payload.gallery.length === 0) delete payload.gallery;
+        
+        // If no primary image file is physically selected, wipe the property entirely 
+        // to stop the Symfony Mime component from trying to guess an empty string/null pointer
+        if (!payload.image || typeof payload.image === 'string') {
+            delete payload.image;
+        }
+        
+        // Remove the gallery array key entirely if no files are staged for upload
+        if (!payload.gallery || payload.gallery.length === 0) {
+            delete payload.gallery;
+        }
 
         post(url, {
             data: payload,
@@ -495,7 +505,7 @@ export default function Projects({ auth, projects = [] }) {
                                         </div>
                                     </div>
 
-                                    {/* FORM BUTTON CONROLS */}
+                                    {/* FORM BUTTON CONTROLS */}
                                     <div className="flex gap-4 pt-4 border-t border-gray-50">
                                         <button type="submit" disabled={processing} className="flex-1 bg-[#E3C263] text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#d4b356] transition-all disabled:opacity-50 shadow-md">
                                             {modalMode === 'create' ? 'Publish Listing' : 'Commit Changes'}
