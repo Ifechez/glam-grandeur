@@ -34,7 +34,6 @@ export default function AuthenticatedLayout({ header, children, auth }) {
                             className={`${isSidebarOpen ? 'h-20' : 'h-10'} transition-all duration-500 object-contain`} 
                         />
                     </Link>
-                    {/* REMOVED SOUL DESIGN BRANDING FOR UNIFORMITY */}
                 </div>
 
                 <nav className="flex-1 px-4 space-y-3 overflow-y-auto">
@@ -43,22 +42,23 @@ export default function AuthenticatedLayout({ header, children, auth }) {
                             {isSidebarOpen ? 'Main Menu' : '•••'}
                         </p>
                         
-                        <NavLink href={route('dashboard')} active={route().current('dashboard')}>
+                        {/* CORRECTED: Updated route to admin.index to match your web.php dashboard configuration */}
+                        <NavLink href={route('admin.index')} active={route().current?.('admin.index')}>
                             <span className="text-lg">⊞</span>
                             {isSidebarOpen && <span className="ml-3 uppercase tracking-widest text-[10px]">Dashboard</span>}
                         </NavLink>
 
-                        <NavLink href={route('admin.projects.index')} active={route().current('admin.projects.*')}>
+                        <NavLink href={route('admin.projects.index')} active={route().current?.('admin.projects.*')}>
                             <span className="text-lg">📁</span>
                             {isSidebarOpen && <span className="ml-3 uppercase tracking-widest text-[10px]">Projects</span>}
                         </NavLink>
 
-                        <NavLink href={route('admin.services.index')} active={route().current('admin.services.*')}>
+                        <NavLink href={route('admin.services.index')} active={route().current?.('admin.services.*')}>
                             <span className="text-lg">✦</span>
                             {isSidebarOpen && <span className="ml-3 uppercase tracking-widest text-[10px]">Services</span>}
                         </NavLink>
 
-                        <NavLink href={route('admin.team.index')} active={route().current('admin.team.*')}>
+                        <NavLink href={route('admin.team.index')} active={route().current?.('admin.team.*')}>
                             <span className="text-lg">👥</span>
                             {isSidebarOpen && <span className="ml-3 uppercase tracking-widest text-[10px]">Our Team</span>}
                         </NavLink>
@@ -69,11 +69,7 @@ export default function AuthenticatedLayout({ header, children, auth }) {
                             {isSidebarOpen ? 'System' : '•••'}
                         </p>
                         
-                        {/* NAVIGATION FIX: Direct route name matching web.php to prevent navigation failure */}
-                        <NavLink 
-                            href={route('admin.settings.index')} 
-                            active={route().current('admin.settings.*')}
-                        >
+                        <NavLink href={route('admin.settings.index')} active={route().current?.('admin.settings.*')}>
                             <span className="text-lg">⚙</span>
                             {isSidebarOpen && <span className="ml-3 uppercase tracking-widest text-[10px]">Settings</span>}
                         </NavLink>
