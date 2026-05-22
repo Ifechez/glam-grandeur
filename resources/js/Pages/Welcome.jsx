@@ -369,13 +369,6 @@ export default function Welcome({
                             >
                                 Projects
                             </a>
-
-                            <a
-                                href="#contact"
-                                className="hover:text-[#E3C263] transition-colors"
-                            >
-                                Contact
-                            </a>
                         </div>
 
                         {/* CTA */}
@@ -615,10 +608,7 @@ export default function Welcome({
             </section>
 
         
-{/* --- 4. SERVICES SECTION --- */}
-{/* =========================================================================
-    SERVICES SECTION (FULLY BACKEND CONNECTED)
-=========================================================================== */}
+
 <section
     id="services"
     className="py-20 md:py-32 px-6 md:px-20 bg-white"

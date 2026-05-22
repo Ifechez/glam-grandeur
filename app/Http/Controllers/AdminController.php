@@ -7,6 +7,8 @@ use App\Models\Service;
 use App\Models\Setting;
 use App\Models\Team;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class AdminController extends Controller
@@ -37,92 +39,112 @@ class AdminController extends Controller
     public function projectsIndex()
     {
         return Inertia::render('Admin/Projects', [
-            'projects' => Project::latest()->get()->map(function ($project) {
+            'projects' => Project::latest()
+                ->get()
+                ->map(function ($project) {
+                    return [
+                        'id' => $project->id,
+                        'title' => $project->title,
+                        'slug' => $project->slug,
+                        'client_name' => $project->client_name,
+                        'location' => $project->location,
+                        'category' => $project->category,
+                        'status' => $project->status,
+                        'progress' => $project->progress,
+                        'featured' => $project->featured,
+                        'is_published' => $project->is_published,
+                        'sort_order' => $project->sort_order,
+                        'completed_at' => $project->completed_at,
+                        'short_description' => $project->short_description,
+                        'description' => $project->description,
 
-                $formatPath = function ($path) {
-                    if (!$path) return null;
+                        // MAIN IMAGE
+                        'image_path' => $project->image
+                            ? asset('storage/' . $project->image)
+                            : null,
 
-                    if (str_starts_with($path, 'http')) {
-                        return $path;
-                    }
-
-                    return asset('storage/' . $path);
-                };
-
-                return [
-                    'id' => $project->id,
-                    'title' => $project->title,
-                    'slug' => $project->slug,
-                    'client_name' => $project->client_name,
-                    'location' => $project->location,
-                    'category' => $project->category,
-                    'status' => $project->status,
-                    'progress' => $project->progress,
-                    'featured' => $project->featured,
-                    'is_published' => $project->is_published,
-                    'sort_order' => $project->sort_order,
-                    'completed_at' => $project->completed_at,
-                    'short_description' => $project->short_description,
-                    'description' => $project->description,
-                    'image_path' => $formatPath($project->image),
-
-                    'gallery_images' => $project->gallery_images
-                        ? collect($project->gallery_images)->map(fn ($img) => $formatPath($img))
-                        : [],
-                ];
-            }),
+                        // GALLERY IMAGES
+                        'gallery_images' => collect($project->gallery_images ?? [])
+                            ->map(fn($img) => asset('storage/' . $img))
+                            ->values(),
+                    ];
+                }),
         ]);
     }
 
     public function storeProject(Request $request)
     {
-        // 1. Validate simple structural fields only (Skips image files to prevent fileinfo crashes)
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'client_name' => 'nullable|string|max:255',
             'location' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:255',
-            'status' => 'required|string',
+            'status' => 'required|string|max:255',
             'progress' => 'nullable|integer',
             'featured' => 'nullable|boolean',
             'is_published' => 'nullable|boolean',
             'sort_order' => 'nullable|integer',
-            'completed_at' => 'nullable|string',
+            'completed_at' => 'nullable|date',
             'short_description' => 'nullable|string',
             'description' => 'nullable|string',
+
+            // MAIN IMAGE
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+
+            // GALLERY IMAGES
+            'gallery_images' => 'nullable|array',
+            'gallery_images.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         /*
         |--------------------------------------------------------------------------
-        | MAIN IMAGE
+        | AUTO GENERATE SLUG
         |--------------------------------------------------------------------------
         */
-        if ($request->hasFile('image')) {
-            $file = $request->file('image');
-            $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-            $file->move(public_path('storage/projects'), $name);
-            $validated['image'] = 'projects/' . $name;
+
+        if (empty($validated['slug'])) {
+            $validated['slug'] = Str::slug($validated['title']);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | GALLERY
+        | MAIN IMAGE UPLOAD
         |--------------------------------------------------------------------------
         */
-        $galleryPaths = [];
-        $galleryKey = $request->hasFile('gallery_images') ? 'gallery_images' : ($request->hasFile('gallery') ? 'gallery' : null);
 
-        if ($galleryKey) {
-            foreach ($request->file($galleryKey) as $file) {
-                if ($file instanceof \Illuminate\Http\UploadedFile) {
-                    $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-                    $file->move(public_path('storage/projects/gallery'), $name);
-                    $galleryPaths[] = 'projects/gallery/' . $name;
-                }
+        if ($request->hasFile('image')) {
+            $validated['image'] = $request
+                ->file('image')
+                ->store('projects', 'public');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | GALLERY IMAGE UPLOADS
+        |--------------------------------------------------------------------------
+        */
+
+        $galleryPaths = [];
+
+        if ($request->hasFile('gallery_images')) {
+
+            foreach ($request->file('gallery_images') as $file) {
+
+                $galleryPaths[] = $file->store(
+                    'projects/gallery',
+                    'public'
+                );
             }
         }
+
         $validated['gallery_images'] = $galleryPaths;
+
+        /*
+        |--------------------------------------------------------------------------
+        | CREATE PROJECT
+        |--------------------------------------------------------------------------
+        */
 
         Project::create($validated);
 
@@ -131,57 +153,90 @@ class AdminController extends Controller
 
     public function updateProject(Request $request, Project $project)
     {
-        // 1. Validate simple structural fields only (Skips image files to prevent fileinfo crashes)
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'slug' => 'nullable|string|max:255',
             'client_name' => 'nullable|string|max:255',
             'location' => 'nullable|string|max:255',
             'category' => 'nullable|string|max:255',
-            'status' => 'required|string',
+            'status' => 'required|string|max:255',
             'progress' => 'nullable|integer',
             'featured' => 'nullable|boolean',
             'is_published' => 'nullable|boolean',
             'sort_order' => 'nullable|integer',
-            'completed_at' => 'nullable|string',
+            'completed_at' => 'nullable|date',
             'short_description' => 'nullable|string',
             'description' => 'nullable|string',
+
+            // MAIN IMAGE
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+
+            // GALLERY IMAGES
+            'gallery_images' => 'nullable|array',
+            'gallery_images.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         /*
         |--------------------------------------------------------------------------
-        | IMAGE UPDATE
+        | AUTO GENERATE SLUG
         |--------------------------------------------------------------------------
         */
-        if ($request->hasFile('image')) {
-            if ($project->image && file_exists(public_path('storage/' . $project->image))) {
-                unlink(public_path('storage/' . $project->image));
-            }
 
-            $file = $request->file('image');
-            $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-            $file->move(public_path('storage/projects'), $name);
-            $validated['image'] = 'projects/' . $name;
+        if (empty($validated['slug'])) {
+            $validated['slug'] = Str::slug($validated['title']);
         }
 
         /*
         |--------------------------------------------------------------------------
-        | GALLERY UPDATE
+        | MAIN IMAGE UPDATE
         |--------------------------------------------------------------------------
         */
-        $galleryKey = $request->hasFile('gallery_images') ? 'gallery_images' : ($request->hasFile('gallery') ? 'gallery' : null);
 
-        if ($galleryKey) {
-            $galleryPaths = [];
-            foreach ($request->file($galleryKey) as $file) {
-                if ($file instanceof \Illuminate\Http\UploadedFile) {
-                    $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-                    $file->move(public_path('storage/projects/gallery'), $name);
-                    $galleryPaths[] = 'projects/gallery/' . $name;
-                }
+        if ($request->hasFile('image')) {
+
+            // DELETE OLD IMAGE
+            if ($project->image) {
+                Storage::disk('public')->delete($project->image);
             }
-            $validated['gallery_images'] = $galleryPaths;
+
+            // STORE NEW IMAGE
+            $validated['image'] = $request
+                ->file('image')
+                ->store('projects', 'public');
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | KEEP EXISTING GALLERY
+        |--------------------------------------------------------------------------
+        */
+
+        $gallery = $project->gallery_images ?? [];
+
+        /*
+        |--------------------------------------------------------------------------
+        | ADD NEW GALLERY IMAGES
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->hasFile('gallery_images')) {
+
+            foreach ($request->file('gallery_images') as $file) {
+
+                $gallery[] = $file->store(
+                    'projects/gallery',
+                    'public'
+                );
+            }
+        }
+
+        $validated['gallery_images'] = $gallery;
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE PROJECT
+        |--------------------------------------------------------------------------
+        */
 
         $project->update($validated);
 
@@ -190,9 +245,35 @@ class AdminController extends Controller
 
     public function deleteProject(Project $project)
     {
-        if ($project->image && file_exists(public_path('storage/' . $project->image))) {
-            unlink(public_path('storage/' . $project->image));
+        /*
+        |--------------------------------------------------------------------------
+        | DELETE MAIN IMAGE
+        |--------------------------------------------------------------------------
+        */
+
+        if ($project->image) {
+            Storage::disk('public')->delete($project->image);
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | DELETE GALLERY IMAGES
+        |--------------------------------------------------------------------------
+        */
+
+        if ($project->gallery_images) {
+
+            foreach ($project->gallery_images as $image) {
+
+                Storage::disk('public')->delete($image);
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | DELETE PROJECT
+        |--------------------------------------------------------------------------
+        */
 
         $project->delete();
 
@@ -222,7 +303,7 @@ class AdminController extends Controller
 
         Service::create($validated);
 
-        return back()->with('success', 'Service created.');
+        return back()->with('success', 'Service created successfully.');
     }
 
     public function updateService(Request $request, Service $service)
@@ -235,14 +316,14 @@ class AdminController extends Controller
 
         $service->update($validated);
 
-        return back()->with('success', 'Service updated.');
+        return back()->with('success', 'Service updated successfully.');
     }
 
     public function deleteService(Service $service)
     {
         $service->delete();
 
-        return back()->with('success', 'Service deleted.');
+        return back()->with('success', 'Service deleted successfully.');
     }
 
     /*
@@ -264,18 +345,21 @@ class AdminController extends Controller
             'name' => 'required|string|max:255',
             'position' => 'nullable|string|max:255',
             'bio' => 'nullable|string',
+
+            // IMAGE
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         if ($request->hasFile('image')) {
-            $file = $request->file('image');
-            $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-            $file->move(public_path('storage/team'), $name);
-            $validated['image'] = 'team/' . $name;
+
+            $validated['image'] = $request
+                ->file('image')
+                ->store('team', 'public');
         }
 
         Team::create($validated);
 
-        return back()->with('success', 'Team member added.');
+        return back()->with('success', 'Team member created successfully.');
     }
 
     public function updateTeam(Request $request, Team $team)
@@ -284,33 +368,38 @@ class AdminController extends Controller
             'name' => 'required|string|max:255',
             'position' => 'nullable|string|max:255',
             'bio' => 'nullable|string',
+
+            // IMAGE
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         if ($request->hasFile('image')) {
-            if ($team->image && file_exists(public_path('storage/' . $team->image))) {
-                unlink(public_path('storage/' . $team->image));
+
+            // DELETE OLD IMAGE
+            if ($team->image) {
+                Storage::disk('public')->delete($team->image);
             }
 
-            $file = $request->file('image');
-            $name = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
-            $file->move(public_path('storage/team'), $name);
-            $validated['image'] = 'team/' . $name;
+            // STORE NEW IMAGE
+            $validated['image'] = $request
+                ->file('image')
+                ->store('team', 'public');
         }
 
         $team->update($validated);
 
-        return back()->with('success', 'Team member updated.');
+        return back()->with('success', 'Team member updated successfully.');
     }
 
     public function deleteTeam(Team $team)
     {
-        if ($team->image && file_exists(public_path('storage/' . $team->image))) {
-            unlink(public_path('storage/' . $team->image));
+        if ($team->image) {
+            Storage::disk('public')->delete($team->image);
         }
 
         $team->delete();
 
-        return back()->with('success', 'Team member removed.');
+        return back()->with('success', 'Team member deleted successfully.');
     }
 
     /*
@@ -329,10 +418,10 @@ class AdminController extends Controller
     public function updateSettings(Request $request)
     {
         $validated = $request->validate([
-            'email' => 'nullable|email',
+            'email' => 'nullable|email|max:255',
             'phone_1' => 'nullable|string|max:255',
             'phone_2' => 'nullable|string|max:255',
-            'address' => 'nullable|string|max:255',
+            'address' => 'nullable|string',
             'instagram_handle' => 'nullable|string|max:255',
         ]);
 
@@ -341,6 +430,6 @@ class AdminController extends Controller
             $validated
         );
 
-        return back()->with('success', 'Settings updated.');
+        return back()->with('success', 'Settings updated successfully.');
     }
 }
